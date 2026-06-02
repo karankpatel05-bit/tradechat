@@ -1,6 +1,6 @@
 package com.quant.tradeapp;
 
-import androidx.appcompat.app.AppCompatActivity;
+import android.app.Activity;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -8,7 +8,7 @@ import android.webkit.WebViewClient;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private WebView webView;
 
