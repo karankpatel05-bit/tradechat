@@ -1,0 +1,9 @@
+streamlit
+yfinance
+pandas
+ta
+scikit-learn
+xgboost
+joblib
+numpy<2
+transformers

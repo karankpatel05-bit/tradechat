@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+yfinance
+ta
+xgboost
+transformers
+torch
+joblib
+pydantic
+pandas
+numpy<2

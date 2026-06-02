@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pkl
+.streamlit/secrets.toml
+.DS_Store
+android/.gradle/
+android/app/build/
+android/build/
+server/__pycache__/
