@@ -65,7 +65,7 @@ try:
     sentiment_pipeline = pipeline("sentiment-analysis", model="ProsusAI/finbert")
 except ImportError:
     sentiment_pipeline = None
-    print("Warning: transformers package not found. FinBERT sentiment offline.")
+    print("Info: FinBERT not installed — using Gemini AI for sentiment analysis instead.")
 except Exception as e:
     sentiment_pipeline = None
     print(f"Warning: FinBERT model failed to load. {e}")
