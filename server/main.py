@@ -264,23 +264,48 @@ def extract_ticker(text: str) -> str:
     
     return ""
 
-def get_news_sentiment(ticker: str):
-    """Run FinBERT sentiment on recent Yahoo Finance news."""
-    if sentiment_pipeline is None:
-        return "Sentiment engine offline", 0.0
+async def get_news_sentiment(ticker: str):
+    """Analyze news sentiment using FinBERT (local) or Gemini AI (cloud fallback)."""
     ticker_obj = yf.Ticker(ticker)
     news = ticker_obj.news
     titles = [item['title'] for item in news[:5]] if news else []
     if not titles:
         return "No recent news found", 0.0
-    sentiments = sentiment_pipeline(titles)
-    pos = sum(1 for s in sentiments if s['label'] == 'positive')
-    neg = sum(1 for s in sentiments if s['label'] == 'negative')
-    if pos > neg:
-        return "Positive", pos / len(titles)
-    elif neg > pos:
-        return "Negative", -neg / len(titles)
-    return "Neutral", 0.0
+
+    # Try FinBERT first (available when transformers is installed)
+    if sentiment_pipeline is not None:
+        sentiments = sentiment_pipeline(titles)
+        pos = sum(1 for s in sentiments if s['label'] == 'positive')
+        neg = sum(1 for s in sentiments if s['label'] == 'negative')
+        if pos > neg:
+            return "Positive", pos / len(titles)
+        elif neg > pos:
+            return "Negative", -neg / len(titles)
+        return "Neutral", 0.0
+
+    # Fallback: Use Gemini AI for sentiment analysis
+    if gemini_client is not None:
+        try:
+            prompt = (
+                f"Analyze the sentiment of these {ticker} news headlines. "
+                f"Reply with ONLY one word: Positive, Negative, or Neutral.\n\n"
+                + "\n".join(f"- {t}" for t in titles)
+            )
+            response = gemini_client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt,
+            )
+            result = response.text.strip().lower()
+            if "positive" in result:
+                return "Positive (AI)", 0.5
+            elif "negative" in result:
+                return "Negative (AI)", -0.5
+            return "Neutral (AI)", 0.0
+        except Exception as e:
+            print(f"Gemini sentiment error: {e}")
+            return "Sentiment unavailable", 0.0
+
+    return "Sentiment engine offline", 0.0
 
 async def ask_gemini(user_query: str) -> str:
     """Send a general market question to Google Gemini (Free Tier) with retry logic."""
@@ -392,7 +417,7 @@ async def chat_endpoint(request: ChatRequest):
             except Exception as e:
                 print(f"Prediction Error: {e}")
 
-        sentiment_text, sentiment_score = get_news_sentiment(ticker)
+        sentiment_text, sentiment_score = await get_news_sentiment(ticker)
 
         if tech_prob > 60 and sentiment_score >= 0:
             conclusion = (
