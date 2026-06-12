@@ -13,6 +13,7 @@ import numpy as np
 import re
 import os
 import asyncio
+import time
 import random
 
 # ============================================================
@@ -207,11 +208,54 @@ class ChatRequest(BaseModel):
 # ============================================================
 # HELPER FUNCTIONS
 # ============================================================
+# Common stock name -> ticker aliases for Indian market
+TICKER_ALIASES = {
+    "hdfc bank": "HDFCBANK", "hdfc": "HDFCBANK", "reliance": "RELIANCE",
+    "tcs": "TCS", "infosys": "INFY", "infy": "INFY",
+    "icici bank": "ICICIBANK", "icici": "ICICIBANK",
+    "sbi": "SBIN", "state bank": "SBIN",
+    "tata steel": "TATASTEEL", "suzlon": "SUZLON",
+    "bharti airtel": "BHARTIARTL", "airtel": "BHARTIARTL",
+    "kotak bank": "KOTAKBANK", "kotak": "KOTAKBANK",
+    "axis bank": "AXISBANK", "axis": "AXISBANK",
+    "itc": "ITC", "hul": "HINDUNILVR", "hindustan unilever": "HINDUNILVR",
+    "bajaj finance": "BAJFINANCE", "bajaj": "BAJFINANCE",
+    "asian paints": "ASIANPAINT", "hcl tech": "HCLTECH", "hcltech": "HCLTECH",
+    "maruti": "MARUTI", "sun pharma": "SUNPHARMA", "ultratech": "ULTRACEMCO",
+    "larsen": "LT", "lt": "LT", "wipro": "WIPRO", "adani": "ADANIENT",
+    "tata motors": "TATAMOTORS", "nifty": "^NSEI", "sensex": "^BSESN",
+    "vedanta": "VEDL", "power grid": "POWERGRID", "ntpc": "NTPC",
+    "coal india": "COALINDIA", "ongc": "ONGC", "ioc": "IOC",
+    "bpcl": "BPCL", "gail": "GAIL", "jsw steel": "JSWSTEEL",
+    "tech mahindra": "TECHM", "m&m": "M&M", "mahindra": "M&M",
+    "titan": "TITAN", "zomato": "ZOMATO", "paytm": "PAYTM",
+}
+
 def extract_ticker(text: str) -> str:
-    """Extract an NSE ticker from user text (3-15 char uppercase words)."""
+    """Extract an NSE ticker from user text — case-insensitive with aliases."""
+    text_lower = text.lower()
+    
+    # Check aliases first (handles 'hdfc bank', 'tata steel', etc.)
+    for alias, ticker in sorted(TICKER_ALIASES.items(), key=lambda x: -len(x[0])):
+        if alias in text_lower:
+            return ticker + ".NS"
+    
+    # Fallback: look for uppercase ticker symbols in original text
     words = re.findall(r'\b[A-Z]{3,15}\b', text)
     if words:
         return words[0] + ".NS"
+    
+    # Fallback: look for any 3+ letter word that could be a ticker
+    words = re.findall(r'\b[A-Za-z]{3,15}\b', text)
+    # Filter out common English words
+    stop_words = {'the','and','for','can','you','how','what','why','when','about','analyze',
+                  'analysis','should','buy','sell','hold','tell','show','price','stock',
+                  'share','market','give','will','its','are','this','that','with','from',
+                  'have','has','not','but','was','were','been','being','would','could'}
+    for w in words:
+        if w.lower() not in stop_words and len(w) >= 3:
+            return w.upper() + ".NS"
+    
     return ""
 
 def get_news_sentiment(ticker: str):
@@ -233,7 +277,7 @@ def get_news_sentiment(ticker: str):
     return "Neutral", 0.0
 
 async def ask_gemini(user_query: str) -> str:
-    """Send a general market question to Google Gemini (Free Tier)."""
+    """Send a general market question to Google Gemini (Free Tier) with retry logic."""
     if gemini_model is None:
         return (
             "The AI knowledge engine is not configured yet.\n\n"
@@ -243,12 +287,25 @@ async def ask_gemini(user_query: str) -> str:
             "3. Set it on your server: export GEMINI_API_KEY=\"your-key\"\n"
             "4. Restart the server"
         )
-    try:
-        response = gemini_model.generate_content(user_query)
-        return response.text
-    except Exception as e:
-        print(f"Gemini API Error: {e}")
-        return f"Sorry, I encountered an error processing your question: {str(e)}"
+    
+    # Retry with exponential backoff (handles 429 rate limits)
+    for attempt in range(3):
+        try:
+            response = gemini_model.generate_content(user_query)
+            return response.text
+        except Exception as e:
+            error_str = str(e)
+            if '429' in error_str and attempt < 2:
+                wait_time = (attempt + 1) * 15  # 15s, 30s
+                print(f"Gemini rate limited. Retrying in {wait_time}s (attempt {attempt + 1}/3)")
+                await asyncio.sleep(wait_time)
+                continue
+            print(f"Gemini API Error: {e}")
+            return (
+                "I'm currently rate-limited by the AI engine. Please try again in a minute.\n\n"
+                "**Tip:** You can still ask about specific stocks! Try typing a ticker like:\n"
+                "• RELIANCE\n• HDFC Bank\n• TCS\n• TATASTEEL"
+            )
 
 # ============================================================
 # API ENDPOINTS
