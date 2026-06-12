@@ -7,7 +7,6 @@ import yfinance as yf
 import ta
 import xgboost as xgb
 import joblib
-from transformers import pipeline
 import google.generativeai as genai
 import pandas as pd
 import numpy as np
@@ -63,7 +62,11 @@ except Exception as e:
     print(f"Warning: Offline engine model not found at {MODEL_PATH}. {e}")
 
 try:
+    from transformers import pipeline
     sentiment_pipeline = pipeline("sentiment-analysis", model="ProsusAI/finbert")
+except ImportError:
+    sentiment_pipeline = None
+    print("Warning: transformers package not found. FinBERT sentiment offline.")
 except Exception as e:
     sentiment_pipeline = None
     print(f"Warning: FinBERT model failed to load. {e}")
