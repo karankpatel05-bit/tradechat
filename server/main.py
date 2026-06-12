@@ -7,7 +7,7 @@ import yfinance as yf
 import ta
 import xgboost as xgb
 import joblib
-import google.generativeai as genai
+from google import genai
 import pandas as pd
 import numpy as np
 import re
@@ -22,29 +22,27 @@ import random
 # Set via: export GEMINI_API_KEY="your-key-here"
 # ============================================================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-gemini_model = None
+gemini_client = None
+
+SYSTEM_PROMPT = (
+    "You are an expert Indian Share Market Analyst AI. "
+    "Your name is Quant Trade AI. "
+    "You specialize in NSE/BSE stocks, IPOs, demergers, mutual funds, "
+    "sectoral analysis, and portfolio strategy for Indian retail investors. "
+    "Always provide detailed, well-structured answers with bullet points. "
+    "Include approximate price levels, brokerage estimates, and risk factors when relevant. "
+    "Use ₹ for Indian Rupee. Reference sources like SEBI, NSE, BSE, or major brokerages "
+    "when making claims. Keep the tone professional but accessible. "
+    "If you don't know something, say so honestly. "
+    "Format your responses with **bold** headers and clean structure."
+)
 
 if GEMINI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        gemini_model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash",
-            system_instruction=(
-                "You are an expert Indian Share Market Analyst AI. "
-                "Your name is Quant Trade AI. "
-                "You specialize in NSE/BSE stocks, IPOs, demergers, mutual funds, "
-                "sectoral analysis, and portfolio strategy for Indian retail investors. "
-                "Always provide detailed, well-structured answers with bullet points. "
-                "Include approximate price levels, brokerage estimates, and risk factors when relevant. "
-                "Use ₹ for Indian Rupee. Reference sources like SEBI, NSE, BSE, or major brokerages "
-                "when making claims. Keep the tone professional but accessible. "
-                "If you don't know something, say so honestly. "
-                "Format your responses with **bold** headers and clean structure."
-            )
-        )
-        print("Gemini AI model loaded successfully (Free Tier).")
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        print("Gemini AI client initialized successfully (Free Tier).")
     except Exception as e:
-        gemini_model = None
+        gemini_client = None
         print(f"Warning: Gemini AI failed to initialize. {e}")
 else:
     print("Warning: GEMINI_API_KEY not set. General market Q&A will be unavailable.")
@@ -102,7 +100,7 @@ def compute_features(df):
     df['OBV'] = ta.volume.OnBalanceVolumeIndicator(
         close=df['Close'], volume=df['Volume']
     ).on_balance_volume()
-    df['VROC'] = df['Volume'].pct_change(periods=10) * 100
+    df['VROC'] = df['Volume'].pct_change(periods=10, fill_method=None) * 100
     df.dropna(inplace=True)
     return df
 
@@ -210,6 +208,7 @@ class ChatRequest(BaseModel):
 # ============================================================
 # Common stock name -> ticker aliases for Indian market
 TICKER_ALIASES = {
+    # Major stocks
     "hdfc bank": "HDFCBANK", "hdfc": "HDFCBANK", "reliance": "RELIANCE",
     "tcs": "TCS", "infosys": "INFY", "infy": "INFY",
     "icici bank": "ICICIBANK", "icici": "ICICIBANK",
@@ -222,39 +221,46 @@ TICKER_ALIASES = {
     "bajaj finance": "BAJFINANCE", "bajaj": "BAJFINANCE",
     "asian paints": "ASIANPAINT", "hcl tech": "HCLTECH", "hcltech": "HCLTECH",
     "maruti": "MARUTI", "sun pharma": "SUNPHARMA", "ultratech": "ULTRACEMCO",
-    "larsen": "LT", "lt": "LT", "wipro": "WIPRO", "adani": "ADANIENT",
-    "tata motors": "TATAMOTORS", "nifty": "^NSEI", "sensex": "^BSESN",
+    "larsen": "LT", "wipro": "WIPRO", "adani": "ADANIENT",
+    "tata motors": "TATAMOTORS", "tata power": "TATAPOWER", "tata elxsi": "TATAELXSI",
     "vedanta": "VEDL", "power grid": "POWERGRID", "ntpc": "NTPC",
     "coal india": "COALINDIA", "ongc": "ONGC", "ioc": "IOC",
     "bpcl": "BPCL", "gail": "GAIL", "jsw steel": "JSWSTEEL",
-    "tech mahindra": "TECHM", "m&m": "M&M", "mahindra": "M&M",
+    "tech mahindra": "TECHM", "mahindra": "M&M",
     "titan": "TITAN", "zomato": "ZOMATO", "paytm": "PAYTM",
+    "raymond": "RAYMOND", "dmart": "DMART", "pidilite": "PIDILITIND",
+    "indigo": "INDIGO", "irctc": "IRCTC", "jio financial": "JIOFIN",
+    "adani green": "ADANIGREEN", "adani ports": "ADANIPORTS",
+    "adani enterprises": "ADANIENT", "adani power": "ADANIPOWER",
+    "hero moto": "HEROMOTOCO", "eicher": "EICHERMOT", "bajaj auto": "BAJAJ-AUTO",
+    "nestle": "NESTLEIND", "britannia": "BRITANNIA", "dabur": "DABUR",
+    "godrej": "GODREJCP", "hindustan zinc": "HINDZINC",
+    "cipla": "CIPLA", "dr reddy": "DRREDDY", "divis lab": "DIVISLAB",
+    "apollo hospital": "APOLLOHOSP", "sbi life": "SBILIFE",
+    "hdfc life": "HDFCLIFE", "icici prudential": "ICICIPRULI",
+    # Gold & Silver ETFs
+    "tata gold": "TATAGOLD", "gold etf": "GOLDBEES", "gold bees": "GOLDBEES",
+    "sbi gold": "SETFGOLD", "nippon gold": "GOLDSHARE",
+    "silver etf": "SILVERBEES", "silver bees": "SILVERBEES", "tata silver": "TATASILVER",
+    # Index ETFs
+    "nifty bees": "NIFTYBEES", "nifty etf": "NIFTYBEES",
+    "bank bees": "BANKBEES", "junior bees": "JUNIORBEES",
 }
 
 def extract_ticker(text: str) -> str:
     """Extract an NSE ticker from user text — case-insensitive with aliases."""
     text_lower = text.lower()
     
-    # Check aliases first (handles 'hdfc bank', 'tata steel', etc.)
+    # Check aliases first (handles 'hdfc bank', 'tata gold etf', etc.)
+    # Sort by length descending so 'tata gold' matches before 'tata'
     for alias, ticker in sorted(TICKER_ALIASES.items(), key=lambda x: -len(x[0])):
         if alias in text_lower:
             return ticker + ".NS"
     
-    # Fallback: look for uppercase ticker symbols in original text
+    # Fallback: look for uppercase ticker symbols in original text (e.g. RELIANCE, TCS)
     words = re.findall(r'\b[A-Z]{3,15}\b', text)
     if words:
         return words[0] + ".NS"
-    
-    # Fallback: look for any 3+ letter word that could be a ticker
-    words = re.findall(r'\b[A-Za-z]{3,15}\b', text)
-    # Filter out common English words
-    stop_words = {'the','and','for','can','you','how','what','why','when','about','analyze',
-                  'analysis','should','buy','sell','hold','tell','show','price','stock',
-                  'share','market','give','will','its','are','this','that','with','from',
-                  'have','has','not','but','was','were','been','being','would','could'}
-    for w in words:
-        if w.lower() not in stop_words and len(w) >= 3:
-            return w.upper() + ".NS"
     
     return ""
 
@@ -278,7 +284,7 @@ def get_news_sentiment(ticker: str):
 
 async def ask_gemini(user_query: str) -> str:
     """Send a general market question to Google Gemini (Free Tier) with retry logic."""
-    if gemini_model is None:
+    if gemini_client is None:
         return (
             "The AI knowledge engine is not configured yet.\n\n"
             "**Setup (Free, 2 minutes):**\n"
@@ -291,7 +297,13 @@ async def ask_gemini(user_query: str) -> str:
     # Retry with exponential backoff (handles 429 rate limits)
     for attempt in range(3):
         try:
-            response = gemini_model.generate_content(user_query)
+            response = gemini_client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=user_query,
+                config=genai.types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                ),
+            )
             return response.text
         except Exception as e:
             error_str = str(e)
@@ -354,13 +366,16 @@ async def chat_endpoint(request: ChatRequest):
     if ticker:
         df = yf.download(ticker, period="60d", interval="1d", progress=False)
         if df.empty:
-            return {"response": f"Could not retrieve data for {ticker}. Please check the ticker symbol."}
+            # Ticker not found on yfinance — fall through to Gemini for a smart answer
+            gemini_response = await ask_gemini(message)
+            return {"response": gemini_response}
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
         df = compute_features(df)
         if df.empty:
-            return {"response": f"Could not compute enough technical data for {ticker}."}
+            gemini_response = await ask_gemini(message)
+            return {"response": gemini_response}
 
         latest = df.iloc[-1]
         live_price = float(latest['Close'])

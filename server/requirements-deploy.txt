@@ -7,5 +7,5 @@ joblib
 pydantic
 pandas
 numpy<2
-google-generativeai
+google-genai
 scikit-learn
