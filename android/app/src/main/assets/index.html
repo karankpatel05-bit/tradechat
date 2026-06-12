@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Quant AI</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #0f0f12;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        header {
+            background-color: #18181b;
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid #27272a;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #10b981; /* Emerald accent */
+        }
+        /* Navigation Tabs */
+        .tab-nav {
+            display: flex;
+            background-color: #18181b;
+            border-bottom: 1px solid #27272a;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: #a1a1aa; /* Zinc 400 */
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .tab-btn.active {
+            color: #10b981;
+            border-bottom: 3px solid #10b981;
+        }
+        .tab-btn:hover {
+            color: #ffffff;
+        }
+
+        /* Views */
+        .view-container {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .view-container.active {
+            display: flex;
+        }
+
+        /* Chat View */
+        #chat-window {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .message {
+            max-width: 80%;
+            padding: 0.8rem 1rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .bot-msg {
+            background-color: #27272a; /* Zinc panel */
+            align-self: flex-start;
+            border-left: 3px solid #10b981;
+            white-space: pre-wrap;
+        }
+        .user-msg {
+            background-color: #10b981; /* Emerald */
+            color: #0f0f12;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+        .loading {
+            font-style: italic;
+            opacity: 0.7;
+        }
+        #input-area {
+            display: flex;
+            padding: 1rem;
+            background-color: #18181b;
+            border-top: 1px solid #27272a;
+        }
+        #input-area input {
+            flex: 1;
+            padding: 0.8rem;
+            border-radius: 8px;
+            border: 1px solid #3f3f46;
+            background-color: #27272a;
+            color: #fff;
+            outline: none;
+            font-size: 1rem;
+        }
+        #input-area button {
+            background-color: #10b981;
+            color: #0f0f12;
+            border: none;
+            padding: 0 1.2rem;
+            margin-left: 0.5rem;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #input-area button:active {
+            background-color: #059669;
+        }
+
+        /* Scanner View */
+        #scanner-grid {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            align-content: flex-start;
+        }
+        .scanner-card {
+            background-color: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .scanner-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #27272a;
+            padding-bottom: 0.5rem;
+        }
+        .card-ticker {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        .card-price {
+            font-size: 1.1rem;
+            color: #10b981;
+            font-weight: bold;
+        }
+        .card-body {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: #a1a1aa;
+        }
+        .card-stat strong {
+            color: #ffffff;
+        }
+        .confidence-high {
+            color: #10b981; /* Green for > 60% */
+        }
+        .confidence-med {
+            color: #fbbf24; /* Yellow for < 60% */
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🤖 Quant Trade AI</h1>
+    </header>
+    
+    <div class="tab-nav">
+        <button class="tab-btn active" data-target="view-chat">AI Terminal Chat</button>
+        <button class="tab-btn" data-target="view-scanner">Live Market Scanner</button>
+    </div>
+
+    <!-- View 1: Chat -->
+    <div id="view-chat" class="view-container active">
+        <div id="chat-window">
+            <div class="message bot-msg">Hello! I am your Hybrid Quant Trading AI. Ask me about a stock or say "Show me top setups!"</div>
+        </div>
+        
+        <div id="input-area">
+            <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <!-- View 2: Scanner Grid -->
+    <div id="view-scanner" class="view-container">
+        <div id="scanner-grid">
+            <!-- Cards will be injected here dynamically via JS -->
+            <div style="text-align: center; color: #a1a1aa; width: 100%; margin-top: 2rem; grid-column: 1 / -1;">
+                Initializing Live Market Scanner...
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

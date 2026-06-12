@@ -25,6 +25,12 @@ jobs:
       with:
         gradle-version: '8.4'
       
+    - name: Bundle frontend into Android assets
+      run: |
+        mkdir -p android/app/src/main/assets
+        cp index.html android/app/src/main/assets/
+        cp app.js android/app/src/main/assets/
+
     - name: Build with Gradle
       working-directory: ./android
       run: gradle assembleDebug
