@@ -1,7 +1,7 @@
 // Smart API URL detection:
 // - When served by FastAPI (Render/web): uses relative '/api' (same origin)
 // - When loaded from Android APK (file://): uses the deployed Render URL
-const RENDER_URL = 'https://tradechat.onrender.com'; // UPDATE after Render deploy
+const RENDER_URL = 'https://tradechat-ymrg.onrender.com';
 const API_BASE = window.location.protocol === 'file:' ? `${RENDER_URL}/api` : '/api';
 const CHAT_URL = `${API_BASE}/chat`;
 const SCANNER_URL = `${API_BASE}/scanner/results`;
