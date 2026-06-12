@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+yfinance
+ta
+xgboost
+joblib
+pydantic
+pandas
+numpy<2
+google-generativeai
+scikit-learn

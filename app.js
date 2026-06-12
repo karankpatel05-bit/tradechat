@@ -1,3 +1,11 @@
+// Smart API URL detection:
+// - When served by FastAPI (Render/web): uses relative '/api' (same origin)
+// - When loaded from Android APK (file://): uses the deployed Render URL
+const RENDER_URL = 'https://tradechat.onrender.com'; // UPDATE after Render deploy
+const API_BASE = window.location.protocol === 'file:' ? `${RENDER_URL}/api` : '/api';
+const CHAT_URL = `${API_BASE}/chat`;
+const SCANNER_URL = `${API_BASE}/scanner/results`;
+
 const chatWindow = document.getElementById('chat-window');
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
@@ -5,15 +13,7 @@ const tabBtns = document.querySelectorAll('.tab-btn');
 const viewContainers = document.querySelectorAll('.view-container');
 const scannerGrid = document.getElementById('scanner-grid');
 
-// In emulator this would point to the backend, e.g. http://10.0.2.2:8000/api
-// In production it would be a deployed endpoint like https://your-trade-app.onrender.com/api
-const API_BASE = 'https://your-trade-app.onrender.com/api'; 
-const CHAT_URL = `${API_BASE}/chat`;
-const SCANNER_URL = `${API_BASE}/scanner/results`;
-
 let scannerInterval = null;
-
-// Tab Navigation Logic
 tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         // Remove active class from all tabs and views

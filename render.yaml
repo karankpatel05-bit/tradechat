@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: tradechat
+    runtime: python
+    buildCommand: pip install -r server/requirements-deploy.txt
+    startCommand: cd server && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.10.12"
+    plan: free
