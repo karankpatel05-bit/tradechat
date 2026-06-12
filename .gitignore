@@ -1,6 +1,7 @@
 venv/
 __pycache__/
 *.pkl
+!trade_model.pkl
 .streamlit/secrets.toml
 .DS_Store
 android/.gradle/
